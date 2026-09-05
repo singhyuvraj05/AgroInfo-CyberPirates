@@ -54,3 +54,13 @@ class RecommendationResponse(BaseModel):
     location: str
     assumptions: list[str]
     recommendations: list[CropRecommendationResponse]
+
+
+class VegetationResponse(BaseModel):
+    farm_id: int
+    ndvi: float
+    previous_ndvi: float
+    vegetation_status: str
+    trend: str
+    is_synthetic: bool
+    note: str

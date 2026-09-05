@@ -30,6 +30,16 @@ type Weather = {
   }[];
 };
 
+type Vegetation = {
+  farm_id: number;
+  ndvi: number;
+  previous_ndvi: number;
+  vegetation_status: string;
+  trend: string;
+  is_synthetic: boolean;
+  note: string;
+};
+
 type Advisory = {
   farm_id: number;
   crop: string;
@@ -65,6 +75,7 @@ export default function Home() {
   const [advisory, setAdvisory] = useState<Advisory | null>(null);
   const [recommendations, setRecommendations] =
     useState<Recommendations | null>(null);
+  const [vegetation, setVegetation] = useState<Vegetation | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,12 +87,14 @@ export default function Home() {
           weatherResponse,
           advisoryResponse,
           recommendationsResponse,
+          vegetationResponse,
         ] = await Promise.all([
           fetch(`${apiBaseUrl}/api/health`),
           fetch(`${apiBaseUrl}/api/farms/1`),
           fetch(`${apiBaseUrl}/api/weather/1`),
           fetch(`${apiBaseUrl}/api/advisory/1`),
           fetch(`${apiBaseUrl}/api/recommendations/1`),
+          fetch(`${apiBaseUrl}/api/vegetation/1`),
         ]);
 
         if (
@@ -89,7 +102,8 @@ export default function Home() {
           !farmResponse.ok ||
           !weatherResponse.ok ||
           !advisoryResponse.ok
-          || !recommendationsResponse.ok
+          || !recommendationsResponse.ok ||
+          !vegetationResponse.ok
         ) {
           throw new Error("The backend returned an error.");
         }
@@ -101,6 +115,7 @@ export default function Home() {
         setRecommendations(
           (await recommendationsResponse.json()) as Recommendations,
         );
+        setVegetation((await vegetationResponse.json()) as Vegetation);
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -123,6 +138,28 @@ export default function Home() {
       <section className="card">
         <h2>System status</h2>
         <p>{health ? `FastAPI: ${health.status}` : "Checking FastAPI..."}</p>
+      </section>
+
+      <section className="card">
+        <h2>Vegetation health</h2>
+        {vegetation ? (
+          <>
+            <p className="note">Synthetic/demo data</p>
+            <dl>
+              <dt>Current NDVI</dt>
+              <dd>{vegetation.ndvi}</dd>
+              <dt>Previous NDVI</dt>
+              <dd>{vegetation.previous_ndvi}</dd>
+              <dt>Vegetation status</dt>
+              <dd>{vegetation.vegetation_status}</dd>
+              <dt>Trend</dt>
+              <dd>{vegetation.trend}</dd>
+            </dl>
+            <p>{vegetation.note}</p>
+          </>
+        ) : (
+          <p>Loading vegetation health...</p>
+        )}
       </section>
 
       <section className="card">

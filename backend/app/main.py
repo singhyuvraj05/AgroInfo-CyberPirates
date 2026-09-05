@@ -14,8 +14,10 @@ from app.schemas import (
     AdvisoryResponse,
     FarmResponse,
     RecommendationResponse,
+    VegetationResponse,
     WeatherResponse,
 )
+from app.vegetation import get_vegetation
 from app.weather import WeatherServiceError, get_weather
 
 
@@ -239,4 +241,27 @@ def get_farm_recommendations(
             }
             for recommendation in recommendations
         ],
+    )
+
+
+@app.get(
+    "/api/vegetation/{farm_id}",
+    response_model=VegetationResponse,
+)
+def get_farm_vegetation(
+    farm_id: int, db: Session = Depends(get_db)
+) -> VegetationResponse:
+    farm = db.get(Farm, farm_id)
+    if farm is None:
+        raise HTTPException(status_code=404, detail="Farm not found")
+
+    vegetation = get_vegetation(farm.id)
+    return VegetationResponse(
+        farm_id=farm.id,
+        ndvi=vegetation.ndvi,
+        previous_ndvi=vegetation.previous_ndvi,
+        vegetation_status=vegetation.vegetation_status,
+        trend=vegetation.trend,
+        is_synthetic=vegetation.is_synthetic,
+        note=vegetation.note,
     )

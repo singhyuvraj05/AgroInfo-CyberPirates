@@ -62,6 +62,7 @@ Useful endpoints:
 - `GET http://localhost:8000/api/weather/1`
 - `GET http://localhost:8000/api/advisory/1`
 - `GET http://localhost:8000/api/recommendations/1`
+- `GET http://localhost:8000/api/vegetation/1`
 
 ## Frontend setup
 
@@ -101,6 +102,29 @@ comparison, not a probability, yield prediction, or success guarantee. Water
 availability is unknown and is not scored. Location is contextual only, and no
 planting season is inferred. Crop thresholds, weights, and regenerative
 descriptions are prototype assumptions requiring agronomic validation.
+
+The vegetation endpoint uses deterministic synthetic NDVI values for the demo:
+current NDVI `0.56` and previous NDVI `0.48` for farm 1. It does not use
+satellite imagery, remote-sensing APIs, or field measurements.
+
+Prototype NDVI assumptions:
+
+```text
+NDVI < 0.30          stressed
+0.30 <= NDVI <= 0.55 moderate
+NDVI > 0.55          healthy
+```
+
+Prototype trend assumptions compare current and previous synthetic values:
+
+```text
+change > 0.03  improving
+change < -0.03 declining
+otherwise      stable
+```
+
+These thresholds are demonstration heuristics, not universal scientific
+standards or crop-health diagnosis.
 
 ## Configuration
 
