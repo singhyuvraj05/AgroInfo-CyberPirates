@@ -9,7 +9,13 @@ from app.advisory import AdvisoryInputs, generate_advisory
 from app.config import settings
 from app.database import Base, engine, get_db
 from app.models import Farm
-from app.schemas import AdvisoryResponse, FarmResponse, WeatherResponse
+from app.recommendation import RecommendationInputs, rank_crops
+from app.schemas import (
+    AdvisoryResponse,
+    FarmResponse,
+    RecommendationResponse,
+    WeatherResponse,
+)
 from app.weather import WeatherServiceError, get_weather
 
 
@@ -175,4 +181,62 @@ def get_farm_advisory(
         recommendations=result.recommendations,
         reasons=result.reasons,
         confidence=result.confidence,
+    )
+
+
+@app.get(
+    "/api/recommendations/{farm_id}",
+    response_model=RecommendationResponse,
+)
+def get_farm_recommendations(
+    farm_id: int, db: Session = Depends(get_db)
+) -> RecommendationResponse:
+    farm = db.get(Farm, farm_id)
+    if farm is None:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    soil_values = (farm.soil_ph, farm.nitrogen, farm.phosphorus, farm.potassium)
+    if farm.latitude is None or farm.longitude is None:
+        raise HTTPException(status_code=422, detail="Farm coordinates are missing")
+    if any(value is None for value in soil_values):
+        raise HTTPException(status_code=422, detail="Farm soil data is incomplete")
+
+    try:
+        weather = get_weather(farm.latitude, farm.longitude)
+    except WeatherServiceError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    current = weather["current"]
+    daily = weather["daily"]
+    recommendations = rank_crops(
+        RecommendationInputs(
+            soil_ph=farm.soil_ph,
+            nitrogen=farm.nitrogen,
+            phosphorus=farm.phosphorus,
+            potassium=farm.potassium,
+            temperature=current["temperature_2m"],
+            humidity=current["relative_humidity_2m"],
+            precipitation=current["precipitation"],
+            forecast_precipitation=sum(daily["precipitation_sum"]),
+        )
+    )
+    return RecommendationResponse(
+        farm_id=farm.id,
+        location=", ".join((farm.village, farm.district, farm.state)),
+        assumptions=[
+            "Suitability scores are deterministic MVP heuristics, not probabilities.",
+            "Water availability is unknown and is not scored in V1.",
+            "Location is contextual only; no planting season is inferred.",
+            "Crop profiles and regenerative descriptions are prototype assumptions.",
+        ],
+        recommendations=[
+            {
+                "crop": recommendation.crop,
+                "suitability_score": recommendation.suitability_score,
+                "score_breakdown": recommendation.score_breakdown,
+                "reasons": recommendation.reasons,
+                "water_requirement": recommendation.water_requirement,
+                "regenerative_benefit": recommendation.regenerative_benefit,
+            }
+            for recommendation in recommendations
+        ],
     )

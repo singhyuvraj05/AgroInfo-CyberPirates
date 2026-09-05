@@ -38,3 +38,19 @@ class AdvisoryResponse(BaseModel):
     recommendations: list[str]
     reasons: list[str]
     confidence: float
+
+
+class CropRecommendationResponse(BaseModel):
+    crop: str
+    suitability_score: int
+    score_breakdown: dict[str, int]
+    reasons: list[str]
+    water_requirement: str
+    regenerative_benefit: str
+
+
+class RecommendationResponse(BaseModel):
+    farm_id: int
+    location: str
+    assumptions: list[str]
+    recommendations: list[CropRecommendationResponse]

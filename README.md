@@ -61,6 +61,7 @@ Useful endpoints:
 - `GET http://localhost:8000/api/farms/1`
 - `GET http://localhost:8000/api/weather/1`
 - `GET http://localhost:8000/api/advisory/1`
+- `GET http://localhost:8000/api/recommendations/1`
 
 ## Frontend setup
 
@@ -84,6 +85,22 @@ The advisory endpoint applies transparent V1 rules to the farm crop, demo soil
 measurements, current weather, and three-day forecast rainfall. Nutrient
 thresholds are demo assumptions in mg/kg, not a substitute for a local soil
 test or agronomist.
+
+The recommendation endpoint ranks only Soybean, Pearl millet, Chickpea, and
+Sorghum using a deterministic 100-point MVP heuristic:
+
+```text
+soil suitability:          45 points
+weather suitability:       50 points
+regenerative suitability:   5 points
+total:                    100 points
+```
+
+The score is always the exact sum of the score breakdown. It is a suitability
+comparison, not a probability, yield prediction, or success guarantee. Water
+availability is unknown and is not scored. Location is contextual only, and no
+planting season is inferred. Crop thresholds, weights, and regenerative
+descriptions are prototype assumptions requiring agronomic validation.
 
 ## Configuration
 

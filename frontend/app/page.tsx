@@ -41,6 +41,20 @@ type Advisory = {
   confidence: number;
 };
 
+type Recommendations = {
+  farm_id: number;
+  location: string;
+  assumptions: string[];
+  recommendations: {
+    crop: string;
+    suitability_score: number;
+    score_breakdown: Record<string, number>;
+    reasons: string[];
+    water_requirement: string;
+    regenerative_benefit: string;
+  }[];
+};
+
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -49,6 +63,8 @@ export default function Home() {
   const [farm, setFarm] = useState<Farm | null>(null);
   const [weather, setWeather] = useState<Weather | null>(null);
   const [advisory, setAdvisory] = useState<Advisory | null>(null);
+  const [recommendations, setRecommendations] =
+    useState<Recommendations | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,11 +75,13 @@ export default function Home() {
           farmResponse,
           weatherResponse,
           advisoryResponse,
+          recommendationsResponse,
         ] = await Promise.all([
           fetch(`${apiBaseUrl}/api/health`),
           fetch(`${apiBaseUrl}/api/farms/1`),
           fetch(`${apiBaseUrl}/api/weather/1`),
           fetch(`${apiBaseUrl}/api/advisory/1`),
+          fetch(`${apiBaseUrl}/api/recommendations/1`),
         ]);
 
         if (
@@ -71,6 +89,7 @@ export default function Home() {
           !farmResponse.ok ||
           !weatherResponse.ok ||
           !advisoryResponse.ok
+          || !recommendationsResponse.ok
         ) {
           throw new Error("The backend returned an error.");
         }
@@ -79,6 +98,9 @@ export default function Home() {
         setFarm((await farmResponse.json()) as Farm);
         setWeather((await weatherResponse.json()) as Weather);
         setAdvisory((await advisoryResponse.json()) as Advisory);
+        setRecommendations(
+          (await recommendationsResponse.json()) as Recommendations,
+        );
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -101,6 +123,37 @@ export default function Home() {
       <section className="card">
         <h2>System status</h2>
         <p>{health ? `FastAPI: ${health.status}` : "Checking FastAPI..."}</p>
+      </section>
+
+      <section className="card">
+        <h2>Crop and regenerative recommendations</h2>
+        {recommendations ? (
+          <>
+            <p>{recommendations.location}</p>
+            <p className="note">
+              Suitability scores are deterministic MVP heuristics, not
+              probabilities or yield predictions.
+            </p>
+            {recommendations.recommendations.map((recommendation) => (
+              <article key={recommendation.crop}>
+                <h3>
+                  {recommendation.crop}: {recommendation.suitability_score}/100
+                </h3>
+                <p>Water requirement: {recommendation.water_requirement}</p>
+                <ul>
+                  {recommendation.reasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+                <p>
+                  Regenerative note: {recommendation.regenerative_benefit}
+                </p>
+              </article>
+            ))}
+          </>
+        ) : (
+          <p>Loading recommendations...</p>
+        )}
       </section>
 
       <section className="card">
