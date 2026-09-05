@@ -1,0 +1,41 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, sans-serif;
+  background: #f4f7f2;
+  color: #1d2a1f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.container {
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 48px 24px;
+}
+
+.card {
+  background: white;
+  border: 1px solid #d9e3d6;
+  border-radius: 8px;
+  margin-top: 20px;
+  padding: 20px;
+}
+
+.error {
+  color: #a52222;
+}
+
+dt {
+  font-weight: bold;
+  margin-top: 12px;
+}
+
+dd {
+  margin: 4px 0 0;
+}
