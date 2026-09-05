@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type HealthResponse = {
-  status: string;
-};
+type HealthResponse = { status: string };
 
 type Farm = {
   id: number;
@@ -40,31 +38,6 @@ type Vegetation = {
   note: string;
 };
 
-type DiseaseScreening = {
-  status: string;
-  observation: string;
-  certainty: string;
-  next_step: string;
-  is_demo: boolean;
-  disclaimer: string;
-};
-
-type CooperativeInsight = {
-  id: number;
-  publisher_state: string;
-  crop: string;
-  insight_type: string;
-  title: string;
-  description: string;
-  version: string;
-  metric_label: string | null;
-  metric_value: number | null;
-  status: "published" | "adapted";
-  source_insight_id: number | null;
-  adaptation_note: string | null;
-  created_at: string;
-};
-
 type Advisory = {
   farm_id: number;
   crop: string;
@@ -90,8 +63,45 @@ type Recommendations = {
   }[];
 };
 
+type DiseaseScreening = {
+  status: string;
+  observation: string;
+  certainty: string;
+  next_step: string;
+  is_demo: boolean;
+  disclaimer: string;
+};
+
+type CooperativeInsight = {
+  id: number;
+  publisher_state: string;
+  crop: string;
+  insight_type: string;
+  title: string;
+  description: string;
+  version: string;
+  metric_label: string | null;
+  metric_value: number | null;
+  status: "published" | "adapted";
+  source_insight_id: number | null;
+  adaptation_note: string | null;
+  created_at: string;
+};
+
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("The backend returned an error.");
+  }
+  return (await response.json()) as T;
+}
+
+function getErrorMessage(errorValue: unknown, fallback: string): string {
+  return errorValue instanceof Error ? errorValue.message : fallback;
+}
 
 export default function Home() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -101,13 +111,16 @@ export default function Home() {
   const [recommendations, setRecommendations] =
     useState<Recommendations | null>(null);
   const [vegetation, setVegetation] = useState<Vegetation | null>(null);
+  const [cooperativeInsights, setCooperativeInsights] = useState<
+    CooperativeInsight[]
+  >([]);
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
+
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [screening, setScreening] = useState<DiseaseScreening | null>(null);
   const [screeningError, setScreeningError] = useState<string | null>(null);
   const [isScreening, setIsScreening] = useState(false);
-  const [cooperativeInsights, setCooperativeInsights] = useState<
-    CooperativeInsight[]
-  >([]);
+
   const [cooperativeError, setCooperativeError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishState, setPublishState] = useState("Maharashtra");
@@ -120,62 +133,65 @@ export default function Home() {
   const [publishVersion, setPublishVersion] = useState("v1");
   const [reuseState, setReuseState] = useState<Record<number, string>>({});
   const [reuseNotes, setReuseNotes] = useState<Record<number, string>>({});
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [
-          healthResponse,
-          farmResponse,
-          weatherResponse,
-          advisoryResponse,
-          recommendationsResponse,
-          vegetationResponse,
-          cooperativeResponse,
-        ] = await Promise.all([
-          fetch(`${apiBaseUrl}/api/health`),
-          fetch(`${apiBaseUrl}/api/farms/1`),
-          fetch(`${apiBaseUrl}/api/weather/1`),
-          fetch(`${apiBaseUrl}/api/advisory/1`),
-          fetch(`${apiBaseUrl}/api/recommendations/1`),
-          fetch(`${apiBaseUrl}/api/vegetation/1`),
-          fetch(`${apiBaseUrl}/api/cooperative/insights`),
-        ]);
+    const requests: {
+      key: string;
+      request: Promise<unknown>;
+      onSuccess: (value: unknown) => void;
+    }[] = [
+      {
+        key: "health",
+        request: fetchJson<HealthResponse>(`${apiBaseUrl}/api/health`),
+        onSuccess: (value) => setHealth(value as HealthResponse),
+      },
+      {
+        key: "farm",
+        request: fetchJson<Farm>(`${apiBaseUrl}/api/farms/1`),
+        onSuccess: (value) => setFarm(value as Farm),
+      },
+      {
+        key: "weather",
+        request: fetchJson<Weather>(`${apiBaseUrl}/api/weather/1`),
+        onSuccess: (value) => setWeather(value as Weather),
+      },
+      {
+        key: "advisory",
+        request: fetchJson<Advisory>(`${apiBaseUrl}/api/advisory/1`),
+        onSuccess: (value) => setAdvisory(value as Advisory),
+      },
+      {
+        key: "recommendations",
+        request: fetchJson<Recommendations>(
+          `${apiBaseUrl}/api/recommendations/1`,
+        ),
+        onSuccess: (value) => setRecommendations(value as Recommendations),
+      },
+      {
+        key: "vegetation",
+        request: fetchJson<Vegetation>(`${apiBaseUrl}/api/vegetation/1`),
+        onSuccess: (value) => setVegetation(value as Vegetation),
+      },
+      {
+        key: "cooperative",
+        request: fetchJson<CooperativeInsight[]>(
+          `${apiBaseUrl}/api/cooperative/insights`,
+        ),
+        onSuccess: (value) =>
+          setCooperativeInsights(value as CooperativeInsight[]),
+      },
+    ];
 
-        if (
-          !healthResponse.ok ||
-          !farmResponse.ok ||
-          !weatherResponse.ok ||
-          !advisoryResponse.ok
-          || !recommendationsResponse.ok ||
-          !vegetationResponse.ok
-          || !cooperativeResponse.ok
-        ) {
-          throw new Error("The backend returned an error.");
-        }
-
-        setHealth((await healthResponse.json()) as HealthResponse);
-        setFarm((await farmResponse.json()) as Farm);
-        setWeather((await weatherResponse.json()) as Weather);
-        setAdvisory((await advisoryResponse.json()) as Advisory);
-        setRecommendations(
-          (await recommendationsResponse.json()) as Recommendations,
-        );
-        setVegetation((await vegetationResponse.json()) as Vegetation);
-        setCooperativeInsights(
-          (await cooperativeResponse.json()) as CooperativeInsight[],
-        );
-      } catch (requestError) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Unable to connect to the backend.",
-        );
-      }
-    }
-
-    void loadData();
+    requests.forEach(({ key, request, onSuccess }) => {
+      void request
+        .then(onSuccess)
+        .catch((errorValue: unknown) => {
+          setLoadErrors((current) => ({
+            ...current,
+            [key]: getErrorMessage(errorValue, "Unable to load this section."),
+          }));
+        });
+    });
   }, []);
 
   async function submitDiseaseScreening() {
@@ -208,11 +224,9 @@ export default function Home() {
         throw new Error(body.detail ?? "Unable to screen the image.");
       }
       setScreening((await response.json()) as DiseaseScreening);
-    } catch (requestError) {
+    } catch (errorValue) {
       setScreeningError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to screen the image.",
+        getErrorMessage(errorValue, "Unable to screen the image."),
       );
     } finally {
       setIsScreening(false);
@@ -246,11 +260,12 @@ export default function Home() {
       setPublishDescription("");
       setPublishMetricLabel("");
       setPublishMetricValue("");
-    } catch (requestError) {
+    } catch (errorValue) {
       setCooperativeError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to publish the cooperative insight.",
+        getErrorMessage(
+          errorValue,
+          "Unable to publish the cooperative insight.",
+        ),
       );
     } finally {
       setIsPublishing(false);
@@ -276,254 +291,361 @@ export default function Home() {
       }
       const adapted = (await response.json()) as CooperativeInsight;
       setCooperativeInsights((current) => [...current, adapted]);
-    } catch (requestError) {
+    } catch (errorValue) {
       setCooperativeError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to reuse the cooperative insight.",
+        getErrorMessage(
+          errorValue,
+          "Unable to reuse the cooperative insight.",
+        ),
       );
     }
   }
 
   return (
-    <main className="container">
-      <h1>AgroInfo</h1>
-      <p>Initial frontend → FastAPI → MySQL milestone</p>
-
-      {error && <p className="error">{error}</p>}
-
-      <section className="card">
-        <h2>Cooperative State Knowledge Network</h2>
-        <p className="note">
-          Prototype cooperative knowledge/model registry. Demo records are
-          fictional; this is not real inter-state federation, authentication,
-          or institutional verification.
-        </p>
-        <h3>Publish insight</h3>
-        <div className="form-grid">
-          <input value={publishState} onChange={(event) => setPublishState(event.target.value)} placeholder="State" />
-          <input value={publishCrop} onChange={(event) => setPublishCrop(event.target.value)} placeholder="Crop" />
-          <select value={publishType} onChange={(event) => setPublishType(event.target.value)}>
-            <option value="advisory">Advisory</option>
-            <option value="crop_recommendation">Crop recommendation</option>
-            <option value="vegetation">Vegetation</option>
-            <option value="disease_screening">Disease screening</option>
-          </select>
-          <input value={publishVersion} onChange={(event) => setPublishVersion(event.target.value)} placeholder="Version" />
-          <input value={publishTitle} onChange={(event) => setPublishTitle(event.target.value)} placeholder="Title" />
-          <input value={publishMetricLabel} onChange={(event) => setPublishMetricLabel(event.target.value)} placeholder="Metric label (optional)" />
-          <input value={publishMetricValue} onChange={(event) => setPublishMetricValue(event.target.value)} placeholder="Metric value (optional)" type="number" />
+    <main className="dashboard-shell">
+      <header className="dashboard-header">
+        <div>
+          <p className="eyebrow">AgroInfo</p>
+          <h1>Farmer Decision Dashboard</h1>
+          <p className="subtitle">
+            Practical field context, transparent signals, and next steps in one
+            place.
+          </p>
         </div>
-        <textarea value={publishDescription} onChange={(event) => setPublishDescription(event.target.value)} placeholder="Description" />
-        <button disabled={isPublishing} onClick={() => void publishInsight()} type="button">
-          {isPublishing ? "Publishing..." : "Publish insight"}
-        </button>
-        {cooperativeError && <p className="error">{cooperativeError}</p>}
-        <h3>Shared registry</h3>
-        {cooperativeInsights.map((insight) => (
-          <article key={insight.id} className="registry-item">
-            <h4>
-              {insight.title} ({insight.status})
-            </h4>
-            <p>{insight.publisher_state} · {insight.crop} · {insight.insight_type}</p>
-            <p>{insight.description}</p>
-            <p>Version: {insight.version}
-              {insight.metric_label && ` · ${insight.metric_label}: ${insight.metric_value}`}
-            </p>
-            {insight.source_insight_id && (
-              <p>Adapted from insight #{insight.source_insight_id}</p>
-            )}
-            {insight.adaptation_note && <p>Adaptation: {insight.adaptation_note}</p>}
-            {insight.status === "published" && (
-              <div className="form-grid">
-                <input
-                  value={reuseState[insight.id] ?? ""}
-                  onChange={(event) => setReuseState((current) => ({ ...current, [insight.id]: event.target.value }))}
-                  placeholder="Target state"
-                />
-                <input
-                  value={reuseNotes[insight.id] ?? ""}
-                  onChange={(event) => setReuseNotes((current) => ({ ...current, [insight.id]: event.target.value }))}
-                  placeholder="Adaptation note"
-                />
-                <button onClick={() => void reuseInsight(insight.id)} type="button">Reuse / adapt</button>
-              </div>
-            )}
-          </article>
-        ))}
+        <div className="header-status">
+          <span className={`status-dot ${health ? "online" : ""}`} />
+          {health ? "FastAPI connected" : "Connecting..."}
+        </div>
+      </header>
+
+      <section className="farm-banner">
+        {farm ? (
+          <>
+            <div>
+              <p className="eyebrow">Your farm</p>
+              <h2>{farm.name}</h2>
+              <p>
+                {farm.village}, {farm.district}, {farm.state}
+              </p>
+            </div>
+            <div className="farm-facts">
+              <span>
+                <strong>Crop</strong>
+                {farm.current_crop}
+              </span>
+              <span>
+                <strong>Area</strong>
+                {farm.area_acres} acres
+              </span>
+              <span>
+                <strong>Soil</strong>
+                {farm.soil_type}
+              </span>
+            </div>
+          </>
+        ) : (
+          <SectionMessage
+            message={
+              loadErrors.farm ?? "Loading farm context..."
+            }
+          />
+        )}
       </section>
 
-      <section className="card">
-        <h2>Constrained disease screening prototype</h2>
-        <p className="note">
-          This accepts an image for a demo workflow only. It is not an AI
-          classifier or a validated disease diagnosis system.
+      <section>
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">At a glance</p>
+            <h2>Current conditions</h2>
+          </div>
+          <p className="section-help">Signals refresh from the existing AgroInfo services.</p>
+        </div>
+        <div className="summary-grid">
+          <article className="summary-card">
+            <div className="card-heading">
+              <h3>Weather</h3>
+              <span className="badge live">Live</span>
+            </div>
+            {weather ? (
+              <>
+                <p className="metric-large">{weather.temperature}°C</p>
+                <div className="metric-row">
+                  <span>Humidity<strong>{weather.humidity}%</strong></span>
+                  <span>Rain now<strong>{weather.precipitation} mm</strong></span>
+                </div>
+                <p className="muted">
+                  Next rain: {weather.forecast[0]?.precipitation_sum ?? 0} mm
+                  {weather.forecast[0]?.precipitation_probability_max === null ||
+                  weather.forecast[0]?.precipitation_probability_max === undefined
+                    ? ""
+                    : ` · ${weather.forecast[0].precipitation_probability_max}% chance`}
+                </p>
+              </>
+            ) : (
+              <SectionMessage message={loadErrors.weather ?? "Loading weather..."} />
+            )}
+          </article>
+
+          <article className="summary-card">
+            <div className="card-heading">
+              <h3>Vegetation</h3>
+              <span className="badge demo">Synthetic/demo</span>
+            </div>
+            {vegetation ? (
+              <>
+                <p className="metric-large">{vegetation.ndvi} <small>NDVI</small></p>
+                <div className="metric-row">
+                  <span>Status<strong>{vegetation.vegetation_status}</strong></span>
+                  <span>Trend<strong>{vegetation.trend}</strong></span>
+                </div>
+                <p className="muted">Synthetic/demo vegetation signal.</p>
+              </>
+            ) : (
+              <SectionMessage
+                message={loadErrors.vegetation ?? "Loading vegetation..."}
+              />
+            )}
+          </article>
+
+          <article className="summary-card">
+            <div className="card-heading">
+              <h3>Advisory status</h3>
+              <span className="badge prototype">Rule-based</span>
+            </div>
+            {advisory ? (
+              <>
+                <p className={`risk-value ${advisory.risk_level}`}>
+                  {advisory.risk_level} risk
+                </p>
+                <div className="metric-row">
+                  <span>Signal<strong>{advisory.score} points</strong></span>
+                  <span>Indicator<strong>{Math.round(advisory.confidence * 100)}%</strong></span>
+                </div>
+                <p className="muted">
+                  Transparent prototype rule-based advisory. Indicator is not
+                  scientific certainty.
+                </p>
+              </>
+            ) : (
+              <SectionMessage message={loadErrors.advisory ?? "Loading advisory..."} />
+            )}
+          </article>
+        </div>
+      </section>
+
+      <section className="primary-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Field guidance</p>
+            <h2>What to do now</h2>
+          </div>
+          <p className="section-help">
+            Transparent prototype rules combine available farm, soil, and
+            weather information.
+          </p>
+        </div>
+        {advisory ? (
+          <div className="advisory-layout">
+            <div className={`risk-panel ${advisory.risk_level}`}>
+              <span>Overall risk</span>
+              <strong>{advisory.risk_level}</strong>
+              <small>{advisory.score} points · prototype signal</small>
+            </div>
+            <div>
+              <h3>Why this matters</h3>
+              <ul>
+                {advisory.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3>Recommended actions</h3>
+              <ul>
+                {advisory.recommendations.map((action) => <li key={action}>{action}</li>)}
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <SectionMessage message={loadErrors.advisory ?? "Loading field guidance..."} />
+        )}
+      </section>
+
+      <section>
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Planning options</p>
+            <h2>Crop &amp; regenerative recommendations</h2>
+          </div>
+          <p className="section-help">
+            Prototype suitability score — not a probability or yield prediction.
+          </p>
+        </div>
+        {recommendations ? (
+          <div className="recommendation-grid">
+            {recommendations.recommendations.map((recommendation) => (
+              <article className="recommendation-card" key={recommendation.crop}>
+                <div className="card-heading">
+                  <h3>{recommendation.crop}</h3>
+                  <strong className="score-pill">{recommendation.suitability_score}/100</strong>
+                </div>
+                <p className="score-label">
+                  Prototype suitability score — not a probability or yield prediction.
+                </p>
+                <ul>
+                  {recommendation.reasons.slice(0, 2).map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+                <p><strong>Water:</strong> {recommendation.water_requirement} <span className="muted">(informational)</span></p>
+                <p><strong>Regenerative note:</strong> {recommendation.regenerative_benefit}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <SectionMessage
+            message={loadErrors.recommendations ?? "Loading recommendations..."}
+          />
+        )}
+      </section>
+
+      <section className="secondary-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Optional tool</p>
+            <h2>Optional Leaf Image Screening</h2>
+          </div>
+          <span className="badge prototype">Prototype only</span>
+        </div>
+        <p className="section-help">
+          Upload a clear JPEG or PNG for a constrained workflow demonstration.
+          This is not a real disease diagnosis.
         </p>
-        <input
-          accept="image/jpeg,image/png"
-          onChange={(event) => {
-            setSelectedImage(event.target.files?.[0] ?? null);
-            setScreening(null);
-            setScreeningError(null);
-          }}
-          type="file"
-        />
-        <button
-          className="screen-button"
-          disabled={isScreening}
-          onClick={() => void submitDiseaseScreening()}
-          type="button"
-        >
-          {isScreening ? "Screening image..." : "Upload and screen"}
-        </button>
+        <div className="upload-row">
+          <input
+            accept="image/jpeg,image/png"
+            aria-label="Leaf image"
+            onChange={(event) => {
+              setSelectedImage(event.target.files?.[0] ?? null);
+              setScreening(null);
+              setScreeningError(null);
+            }}
+            type="file"
+          />
+          <button
+            className="button-primary"
+            disabled={isScreening}
+            onClick={() => void submitDiseaseScreening()}
+            type="button"
+          >
+            {isScreening ? "Screening..." : "Upload and screen"}
+          </button>
+        </div>
         {screeningError && <p className="error">{screeningError}</p>}
         {screening && (
           <div className="screening-result">
-            <p>Status: {screening.status}</p>
-            <p>Observation: {screening.observation}</p>
-            <p>Prototype certainty: {screening.certainty}</p>
-            <p>Suggested next step: {screening.next_step}</p>
+            <p><strong>Status:</strong> {screening.status}</p>
+            <p><strong>Observation:</strong> {screening.observation}</p>
+            <p><strong>Prototype certainty:</strong> {screening.certainty}</p>
+            <p><strong>Suggested next step:</strong> {screening.next_step}</p>
             <p className="note">{screening.disclaimer}</p>
           </div>
         )}
       </section>
 
-      <section className="card">
-        <h2>System status</h2>
-        <p>{health ? `FastAPI: ${health.status}` : "Checking FastAPI..."}</p>
-      </section>
-
-      <section className="card">
-        <h2>Vegetation health</h2>
-        {vegetation ? (
-          <>
-            <p className="note">Synthetic/demo data</p>
-            <dl>
-              <dt>Current NDVI</dt>
-              <dd>{vegetation.ndvi}</dd>
-              <dt>Previous NDVI</dt>
-              <dd>{vegetation.previous_ndvi}</dd>
-              <dt>Vegetation status</dt>
-              <dd>{vegetation.vegetation_status}</dd>
-              <dt>Trend</dt>
-              <dd>{vegetation.trend}</dd>
-            </dl>
-            <p>{vegetation.note}</p>
-          </>
-        ) : (
-          <p>Loading vegetation health...</p>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Crop and regenerative recommendations</h2>
-        {recommendations ? (
-          <>
-            <p>{recommendations.location}</p>
-            <p className="note">
-              Suitability scores are deterministic MVP heuristics, not
-              probabilities or yield predictions.
-            </p>
-            {recommendations.recommendations.map((recommendation) => (
-              <article key={recommendation.crop}>
-                <h3>
-                  {recommendation.crop}: {recommendation.suitability_score}/100
-                </h3>
-                <p>Water requirement: {recommendation.water_requirement}</p>
-                <ul>
-                  {recommendation.reasons.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
-                <p>
-                  Regenerative note: {recommendation.regenerative_benefit}
+      <section className="secondary-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Shared learning</p>
+            <h2>Prototype Cooperative Knowledge Registry</h2>
+          </div>
+          <span className="badge demo">Fictional demo records</span>
+        </div>
+        <p className="section-help">
+          Publish, discover, and adapt linked snapshots. This is not real
+          cross-state federation, authentication, or institutional verification.
+        </p>
+        <h3>Publish an insight</h3>
+        <div className="form-grid">
+          <input value={publishState} onChange={(event) => setPublishState(event.target.value)} placeholder="Publisher state" aria-label="Publisher state" />
+          <input value={publishCrop} onChange={(event) => setPublishCrop(event.target.value)} placeholder="Crop" aria-label="Crop" />
+          <select value={publishType} onChange={(event) => setPublishType(event.target.value)} aria-label="Insight type">
+            <option value="advisory">Advisory</option>
+            <option value="crop_recommendation">Crop recommendation</option>
+            <option value="vegetation">Vegetation</option>
+            <option value="disease_screening">Disease screening</option>
+          </select>
+          <input value={publishVersion} onChange={(event) => setPublishVersion(event.target.value)} placeholder="Version" aria-label="Version" />
+          <input value={publishTitle} onChange={(event) => setPublishTitle(event.target.value)} placeholder="Insight title" aria-label="Insight title" />
+          <input value={publishMetricLabel} onChange={(event) => setPublishMetricLabel(event.target.value)} placeholder="Metric label (optional)" aria-label="Metric label" />
+          <input value={publishMetricValue} onChange={(event) => setPublishMetricValue(event.target.value)} placeholder="Metric value (optional)" aria-label="Metric value" type="number" />
+        </div>
+        <textarea value={publishDescription} onChange={(event) => setPublishDescription(event.target.value)} placeholder="Describe the prototype insight" aria-label="Insight description" />
+        <button className="button-primary" disabled={isPublishing} onClick={() => void publishInsight()} type="button">
+          {isPublishing ? "Publishing..." : "Publish insight"}
+        </button>
+        {cooperativeError && <p className="error">{cooperativeError}</p>}
+        <h3 className="registry-heading">Discover shared records</h3>
+        {cooperativeInsights.length ? (
+          <div className="registry-list">
+            {cooperativeInsights.map((insight) => (
+              <article className="registry-item" key={insight.id}>
+                <div className="registry-title">
+                  <h4>{insight.title}</h4>
+                  <span className={`badge ${insight.status === "adapted" ? "adapted" : "published"}`}>
+                    {insight.status}
+                  </span>
+                </div>
+                <p className="registry-meta">
+                  <strong>{insight.publisher_state}</strong> · {insight.crop} · {insight.insight_type}
                 </p>
+                <p>{insight.description}</p>
+                <p className="muted">
+                  Version {insight.version}
+                  {insight.metric_label
+                    ? ` · ${insight.metric_label}: ${insight.metric_value}`
+                    : ""}
+                </p>
+                {insight.source_insight_id && (
+                  <p className="relationship">
+                    Adapted from insight #{insight.source_insight_id}
+                    {insight.adaptation_note ? ` · ${insight.adaptation_note}` : ""}
+                  </p>
+                )}
+                {insight.status === "published" && (
+                  <div className="reuse-row">
+                    <input
+                      value={reuseState[insight.id] ?? ""}
+                      onChange={(event) => setReuseState((current) => ({ ...current, [insight.id]: event.target.value }))}
+                      placeholder="Target state"
+                      aria-label={`Target state for ${insight.title}`}
+                    />
+                    <input
+                      value={reuseNotes[insight.id] ?? ""}
+                      onChange={(event) => setReuseNotes((current) => ({ ...current, [insight.id]: event.target.value }))}
+                      placeholder="Adaptation note"
+                      aria-label={`Adaptation note for ${insight.title}`}
+                    />
+                    <button onClick={() => void reuseInsight(insight.id)} type="button">Reuse / adapt</button>
+                  </div>
+                )}
               </article>
             ))}
-          </>
+          </div>
         ) : (
-          <p>Loading recommendations...</p>
+          <SectionMessage
+            message={loadErrors.cooperative ?? "No shared records available."}
+          />
         )}
       </section>
 
-      <section className="card">
-        <h2>Agricultural advisory</h2>
-        {advisory ? (
-          <>
-            <p>
-              Overall risk: <strong>{advisory.risk_level}</strong> (
-              {advisory.score} points)
-            </p>
-            <p>Confidence: {Math.round(advisory.confidence * 100)}%</p>
-            <h3>Reasons</h3>
-            <ul>
-              {advisory.reasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-            <h3>Recommended actions</h3>
-            <ul>
-              {advisory.recommendations.map((recommendation) => (
-                <li key={recommendation}>{recommendation}</li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p>Loading advisory...</p>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Weather</h2>
-        {weather ? (
-          <>
-            <p>{weather.location}</p>
-            <dl>
-              <dt>Temperature</dt>
-              <dd>{weather.temperature} °C</dd>
-              <dt>Humidity</dt>
-              <dd>{weather.humidity}%</dd>
-              <dt>Current precipitation</dt>
-              <dd>{weather.precipitation} mm</dd>
-            </dl>
-            <h3>Three-day precipitation forecast</h3>
-            <ul>
-              {weather.forecast.map((day) => (
-                <li key={day.date}>
-                  {day.date}: {day.precipitation_sum} mm
-                  {day.precipitation_probability_max === null
-                    ? ""
-                    : ` (${day.precipitation_probability_max}% chance)`}
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p>Loading weather...</p>
-        )}
-      </section>
-
-      <section className="card">
-        <h2>Demo farm</h2>
-        {farm ? (
-          <dl>
-            <dt>Name</dt>
-            <dd>{farm.name}</dd>
-            <dt>Location</dt>
-            <dd>
-              {farm.village}, {farm.district}, {farm.state}
-            </dd>
-            <dt>Area</dt>
-            <dd>{farm.area_acres} acres</dd>
-            <dt>Soil</dt>
-            <dd>{farm.soil_type}</dd>
-            <dt>Current crop</dt>
-            <dd>{farm.current_crop}</dd>
-          </dl>
-        ) : (
-          <p>Loading farm data...</p>
-        )}
-      </section>
+      <footer className="dashboard-footer">
+        <span className={`status-dot ${health ? "online" : ""}`} />
+        <span>{health ? `Backend status: ${health.status}` : "Backend status unavailable"}</span>
+        <span className="footer-note">AgroInfo prototype dashboard · demo and heuristic signals are labeled throughout.</span>
+      </footer>
     </main>
   );
+}
+
+function SectionMessage({ message }: { message: string }) {
+  return <p className="section-message">{message}</p>;
 }
