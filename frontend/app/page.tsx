@@ -49,6 +49,22 @@ type DiseaseScreening = {
   disclaimer: string;
 };
 
+type CooperativeInsight = {
+  id: number;
+  publisher_state: string;
+  crop: string;
+  insight_type: string;
+  title: string;
+  description: string;
+  version: string;
+  metric_label: string | null;
+  metric_value: number | null;
+  status: "published" | "adapted";
+  source_insight_id: number | null;
+  adaptation_note: string | null;
+  created_at: string;
+};
+
 type Advisory = {
   farm_id: number;
   crop: string;
@@ -89,6 +105,21 @@ export default function Home() {
   const [screening, setScreening] = useState<DiseaseScreening | null>(null);
   const [screeningError, setScreeningError] = useState<string | null>(null);
   const [isScreening, setIsScreening] = useState(false);
+  const [cooperativeInsights, setCooperativeInsights] = useState<
+    CooperativeInsight[]
+  >([]);
+  const [cooperativeError, setCooperativeError] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishState, setPublishState] = useState("Maharashtra");
+  const [publishCrop, setPublishCrop] = useState("Soybean");
+  const [publishType, setPublishType] = useState("advisory");
+  const [publishTitle, setPublishTitle] = useState("");
+  const [publishDescription, setPublishDescription] = useState("");
+  const [publishMetricLabel, setPublishMetricLabel] = useState("");
+  const [publishMetricValue, setPublishMetricValue] = useState("");
+  const [publishVersion, setPublishVersion] = useState("v1");
+  const [reuseState, setReuseState] = useState<Record<number, string>>({});
+  const [reuseNotes, setReuseNotes] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,6 +132,7 @@ export default function Home() {
           advisoryResponse,
           recommendationsResponse,
           vegetationResponse,
+          cooperativeResponse,
         ] = await Promise.all([
           fetch(`${apiBaseUrl}/api/health`),
           fetch(`${apiBaseUrl}/api/farms/1`),
@@ -108,6 +140,7 @@ export default function Home() {
           fetch(`${apiBaseUrl}/api/advisory/1`),
           fetch(`${apiBaseUrl}/api/recommendations/1`),
           fetch(`${apiBaseUrl}/api/vegetation/1`),
+          fetch(`${apiBaseUrl}/api/cooperative/insights`),
         ]);
 
         if (
@@ -117,6 +150,7 @@ export default function Home() {
           !advisoryResponse.ok
           || !recommendationsResponse.ok ||
           !vegetationResponse.ok
+          || !cooperativeResponse.ok
         ) {
           throw new Error("The backend returned an error.");
         }
@@ -129,6 +163,9 @@ export default function Home() {
           (await recommendationsResponse.json()) as Recommendations,
         );
         setVegetation((await vegetationResponse.json()) as Vegetation);
+        setCooperativeInsights(
+          (await cooperativeResponse.json()) as CooperativeInsight[],
+        );
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -182,12 +219,139 @@ export default function Home() {
     }
   }
 
+  async function publishInsight() {
+    setIsPublishing(true);
+    setCooperativeError(null);
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/cooperative/insights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publisher_state: publishState,
+          crop: publishCrop,
+          insight_type: publishType,
+          title: publishTitle,
+          description: publishDescription,
+          version: publishVersion,
+          metric_label: publishMetricLabel || null,
+          metric_value: publishMetricValue ? Number(publishMetricValue) : null,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Unable to publish the cooperative insight.");
+      }
+      const insight = (await response.json()) as CooperativeInsight;
+      setCooperativeInsights((current) => [...current, insight]);
+      setPublishTitle("");
+      setPublishDescription("");
+      setPublishMetricLabel("");
+      setPublishMetricValue("");
+    } catch (requestError) {
+      setCooperativeError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to publish the cooperative insight.",
+      );
+    } finally {
+      setIsPublishing(false);
+    }
+  }
+
+  async function reuseInsight(insightId: number) {
+    setCooperativeError(null);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/cooperative/insights/${insightId}/reuse`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            target_state: reuseState[insightId] ?? "",
+            adaptation_note: reuseNotes[insightId] ?? "",
+          }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Unable to reuse the cooperative insight.");
+      }
+      const adapted = (await response.json()) as CooperativeInsight;
+      setCooperativeInsights((current) => [...current, adapted]);
+    } catch (requestError) {
+      setCooperativeError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to reuse the cooperative insight.",
+      );
+    }
+  }
+
   return (
     <main className="container">
       <h1>AgroInfo</h1>
       <p>Initial frontend → FastAPI → MySQL milestone</p>
 
       {error && <p className="error">{error}</p>}
+
+      <section className="card">
+        <h2>Cooperative State Knowledge Network</h2>
+        <p className="note">
+          Prototype cooperative knowledge/model registry. Demo records are
+          fictional; this is not real inter-state federation, authentication,
+          or institutional verification.
+        </p>
+        <h3>Publish insight</h3>
+        <div className="form-grid">
+          <input value={publishState} onChange={(event) => setPublishState(event.target.value)} placeholder="State" />
+          <input value={publishCrop} onChange={(event) => setPublishCrop(event.target.value)} placeholder="Crop" />
+          <select value={publishType} onChange={(event) => setPublishType(event.target.value)}>
+            <option value="advisory">Advisory</option>
+            <option value="crop_recommendation">Crop recommendation</option>
+            <option value="vegetation">Vegetation</option>
+            <option value="disease_screening">Disease screening</option>
+          </select>
+          <input value={publishVersion} onChange={(event) => setPublishVersion(event.target.value)} placeholder="Version" />
+          <input value={publishTitle} onChange={(event) => setPublishTitle(event.target.value)} placeholder="Title" />
+          <input value={publishMetricLabel} onChange={(event) => setPublishMetricLabel(event.target.value)} placeholder="Metric label (optional)" />
+          <input value={publishMetricValue} onChange={(event) => setPublishMetricValue(event.target.value)} placeholder="Metric value (optional)" type="number" />
+        </div>
+        <textarea value={publishDescription} onChange={(event) => setPublishDescription(event.target.value)} placeholder="Description" />
+        <button disabled={isPublishing} onClick={() => void publishInsight()} type="button">
+          {isPublishing ? "Publishing..." : "Publish insight"}
+        </button>
+        {cooperativeError && <p className="error">{cooperativeError}</p>}
+        <h3>Shared registry</h3>
+        {cooperativeInsights.map((insight) => (
+          <article key={insight.id} className="registry-item">
+            <h4>
+              {insight.title} ({insight.status})
+            </h4>
+            <p>{insight.publisher_state} · {insight.crop} · {insight.insight_type}</p>
+            <p>{insight.description}</p>
+            <p>Version: {insight.version}
+              {insight.metric_label && ` · ${insight.metric_label}: ${insight.metric_value}`}
+            </p>
+            {insight.source_insight_id && (
+              <p>Adapted from insight #{insight.source_insight_id}</p>
+            )}
+            {insight.adaptation_note && <p>Adaptation: {insight.adaptation_note}</p>}
+            {insight.status === "published" && (
+              <div className="form-grid">
+                <input
+                  value={reuseState[insight.id] ?? ""}
+                  onChange={(event) => setReuseState((current) => ({ ...current, [insight.id]: event.target.value }))}
+                  placeholder="Target state"
+                />
+                <input
+                  value={reuseNotes[insight.id] ?? ""}
+                  onChange={(event) => setReuseNotes((current) => ({ ...current, [insight.id]: event.target.value }))}
+                  placeholder="Adaptation note"
+                />
+                <button onClick={() => void reuseInsight(insight.id)} type="button">Reuse / adapt</button>
+              </div>
+            )}
+          </article>
+        ))}
+      </section>
 
       <section className="card">
         <h2>Constrained disease screening prototype</h2>

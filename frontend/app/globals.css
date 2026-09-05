@@ -59,3 +59,29 @@ ul {
   margin-top: 16px;
   padding-top: 12px;
 }
+
+.form-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 12px 0;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  padding: 8px;
+}
+
+textarea {
+  min-height: 72px;
+  width: 100%;
+}
+
+.registry-item {
+  border-top: 1px solid #d9e3d6;
+  margin-top: 16px;
+  padding-top: 12px;
+}

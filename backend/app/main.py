@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.advisory import AdvisoryInputs, generate_advisory
 from app.config import settings
+from app.cooperative import create_insight, list_insights, reuse_insight
 from app.database import Base, engine, get_db
 from app.disease import (
     DemoDiseaseAnalyzer,
@@ -14,11 +15,14 @@ from app.disease import (
     MAX_IMAGE_SIZE,
     validate_image_upload,
 )
-from app.models import Farm
+from app.models import CooperativeInsight, Farm
 from app.recommendation import RecommendationInputs, rank_crops
 from app.schemas import (
     AdvisoryResponse,
     DiseaseScreeningResponse,
+    CooperativeInsightCreate,
+    CooperativeInsightResponse,
+    CooperativeInsightReuse,
     FarmResponse,
     RecommendationResponse,
     VegetationResponse,
@@ -69,6 +73,41 @@ def initialize_database() -> None:
                 )
             )
             session.commit()
+
+        if session.scalar(select(CooperativeInsight.id).limit(1)) is None:
+            session.add_all(
+                [
+                    CooperativeInsight(
+                        publisher_state="Maharashtra",
+                        crop="Soybean",
+                        insight_type="advisory",
+                        title="Humid-period soybean field monitoring",
+                        description=(
+                            "Demo advisory snapshot: inspect soybean leaves after "
+                            "humid weather and forecast rainfall."
+                        ),
+                        version="v1",
+                        metric_label="advisory_score",
+                        metric_value=2,
+                        status="published",
+                    ),
+                    CooperativeInsight(
+                        publisher_state="Gujarat",
+                        crop="Pearl millet",
+                        insight_type="crop_recommendation",
+                        title="Pearl millet suitability reference",
+                        description=(
+                            "Demo crop-suitability snapshot for comparing soil and "
+                            "weather inputs."
+                        ),
+                        version="v1",
+                        metric_label="suitability_score",
+                        metric_value=70,
+                        status="published",
+                    ),
+                ]
+            )
+            session.commit()
         else:
             if demo_farm.latitude is None or demo_farm.longitude is None:
                 demo_farm.latitude = 20.0059
@@ -105,6 +144,50 @@ disease_analyzer = DemoDiseaseAnalyzer()
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post(
+    "/api/cooperative/insights",
+    response_model=CooperativeInsightResponse,
+)
+def publish_cooperative_insight(
+    payload: CooperativeInsightCreate,
+    db: Session = Depends(get_db),
+) -> CooperativeInsight:
+    return create_insight(db, **payload.model_dump())
+
+
+@app.get(
+    "/api/cooperative/insights",
+    response_model=list[CooperativeInsightResponse],
+)
+def discover_cooperative_insights(
+    state: str | None = Query(default=None),
+    crop: str | None = Query(default=None),
+    insight_type: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> list[CooperativeInsight]:
+    return list_insights(db, state=state, crop=crop, insight_type=insight_type)
+
+
+@app.post(
+    "/api/cooperative/insights/{insight_id}/reuse",
+    response_model=CooperativeInsightResponse,
+)
+def reuse_cooperative_insight(
+    insight_id: int,
+    payload: CooperativeInsightReuse,
+    db: Session = Depends(get_db),
+) -> CooperativeInsight:
+    source = db.get(CooperativeInsight, insight_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Cooperative insight not found")
+    return reuse_insight(
+        db,
+        source,
+        target_state=payload.target_state,
+        adaptation_note=payload.adaptation_note,
+    )
 
 
 @app.post(

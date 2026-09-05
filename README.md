@@ -64,6 +64,16 @@ Useful endpoints:
 - `GET http://localhost:8000/api/recommendations/1`
 - `GET http://localhost:8000/api/vegetation/1`
 - `POST http://localhost:8000/api/disease-screening`
+- `POST http://localhost:8000/api/cooperative/insights`
+- `GET http://localhost:8000/api/cooperative/insights`
+- `POST http://localhost:8000/api/cooperative/insights/{id}/reuse`
+
+The cooperative feature is a prototype cooperative knowledge/model registry.
+It stores fictional demo records and linked reuse/adaptation records. It is not
+real inter-state federation, distributed synchronization, blockchain,
+authentication, institutional verification, model-weight transfer, or
+scientifically validated knowledge transfer. Registry metrics may come from
+heuristic, synthetic, or constrained-demo features.
 
 ## Frontend setup
 
