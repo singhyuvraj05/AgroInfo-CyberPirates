@@ -1,7 +1,31 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class FarmCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    state: str = Field(min_length=1, max_length=80)
+    district: str = Field(min_length=1, max_length=80)
+    village: str = Field(min_length=1, max_length=80)
+    area_acres: float = Field(gt=0, allow_inf_nan=False)
+    soil_type: str = Field(min_length=1, max_length=80)
+    current_crop: str = Field(min_length=1, max_length=80)
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    soil_ph: float = Field(ge=0, le=14, allow_inf_nan=False)
+    nitrogen: float = Field(ge=0, allow_inf_nan=False)
+    phosphorus: float = Field(ge=0, allow_inf_nan=False)
+    potassium: float = Field(ge=0, allow_inf_nan=False)
+
+    @field_validator("name", "state", "district", "village", "soil_type", "current_crop")
+    @classmethod
+    def reject_blank_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Text fields cannot be blank")
+        return value
 
 
 class FarmResponse(BaseModel):
@@ -15,6 +39,12 @@ class FarmResponse(BaseModel):
     area_acres: float
     soil_type: str
     current_crop: str
+    latitude: float | None
+    longitude: float | None
+    soil_ph: float | None
+    nitrogen: float | None
+    phosphorus: float | None
+    potassium: float | None
 
 
 class ForecastDay(BaseModel):

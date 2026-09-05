@@ -23,6 +23,7 @@ from app.schemas import (
     CooperativeInsightCreate,
     CooperativeInsightResponse,
     CooperativeInsightReuse,
+    FarmCreate,
     FarmResponse,
     RecommendationResponse,
     VegetationResponse,
@@ -144,6 +145,15 @@ disease_analyzer = DemoDiseaseAnalyzer()
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/farms", response_model=FarmResponse, status_code=201)
+def create_farm(payload: FarmCreate, db: Session = Depends(get_db)) -> Farm:
+    farm = Farm(**payload.model_dump())
+    db.add(farm)
+    db.commit()
+    db.refresh(farm)
+    return farm
 
 
 @app.post(

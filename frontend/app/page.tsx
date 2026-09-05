@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 type HealthResponse = { status: string };
 
@@ -13,6 +13,12 @@ type Farm = {
   area_acres: number;
   soil_type: string;
   current_crop: string;
+  latitude: number | null;
+  longitude: number | null;
+  soil_ph: number | null;
+  nitrogen: number | null;
+  phosphorus: number | null;
+  potassium: number | null;
 };
 
 type Weather = {
@@ -90,6 +96,7 @@ type CooperativeInsight = {
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const demoCoordinates = { lat: 20.0059, lng: 73.7897 };
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -115,6 +122,28 @@ export default function Home() {
     CooperativeInsight[]
   >([]);
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
+  const [activeFarmId, setActiveFarmId] = useState(1);
+  const [farmForm, setFarmForm] = useState({
+    name: "",
+    state: "",
+    district: "",
+    village: "",
+    area_acres: "",
+    soil_type: "",
+    current_crop: "",
+    soil_ph: "",
+    nitrogen: "",
+    phosphorus: "",
+    potassium: "",
+  });
+  const [selectedCoordinates, setSelectedCoordinates] = useState(demoCoordinates);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [farmFormError, setFarmFormError] = useState<string | null>(null);
+  const [farmFormMessage, setFarmFormMessage] = useState<string | null>(null);
+  const [isCreatingFarm, setIsCreatingFarm] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [screening, setScreening] = useState<DiseaseScreening | null>(null);
@@ -147,29 +176,29 @@ export default function Home() {
       },
       {
         key: "farm",
-        request: fetchJson<Farm>(`${apiBaseUrl}/api/farms/1`),
+        request: fetchJson<Farm>(`${apiBaseUrl}/api/farms/${activeFarmId}`),
         onSuccess: (value) => setFarm(value as Farm),
       },
       {
         key: "weather",
-        request: fetchJson<Weather>(`${apiBaseUrl}/api/weather/1`),
+        request: fetchJson<Weather>(`${apiBaseUrl}/api/weather/${activeFarmId}`),
         onSuccess: (value) => setWeather(value as Weather),
       },
       {
         key: "advisory",
-        request: fetchJson<Advisory>(`${apiBaseUrl}/api/advisory/1`),
+        request: fetchJson<Advisory>(`${apiBaseUrl}/api/advisory/${activeFarmId}`),
         onSuccess: (value) => setAdvisory(value as Advisory),
       },
       {
         key: "recommendations",
         request: fetchJson<Recommendations>(
-          `${apiBaseUrl}/api/recommendations/1`,
+          `${apiBaseUrl}/api/recommendations/${activeFarmId}`,
         ),
         onSuccess: (value) => setRecommendations(value as Recommendations),
       },
       {
         key: "vegetation",
-        request: fetchJson<Vegetation>(`${apiBaseUrl}/api/vegetation/1`),
+        request: fetchJson<Vegetation>(`${apiBaseUrl}/api/vegetation/${activeFarmId}`),
         onSuccess: (value) => setVegetation(value as Vegetation),
       },
       {
@@ -192,7 +221,135 @@ export default function Home() {
           }));
         });
     });
+  }, [activeFarmId]);
+
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!key) {
+      setMapError("Google Maps is unavailable. Enter coordinates manually below.");
+      return;
+    }
+
+    function initializeMap() {
+      if (!mapContainerRef.current || !window.google?.maps) {
+        setMapError("Google Maps could not be loaded. Enter coordinates manually below.");
+        return;
+      }
+      const map = new window.google.maps.Map(mapContainerRef.current, {
+        center: selectedCoordinates,
+        zoom: 8,
+      });
+      const marker = new window.google.maps.Marker({
+        map,
+        position: selectedCoordinates,
+      });
+      map.addListener("click", (event) => {
+        if (!event.latLng) return;
+        const coordinates = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+        setSelectedCoordinates(coordinates);
+        marker.setPosition(coordinates);
+      });
+      mapRef.current = map;
+      markerRef.current = marker;
+      setMapError(null);
+    }
+
+    if (window.google?.maps) {
+      initializeMap();
+      return;
+    }
+    const existingScript = document.getElementById("google-maps-script");
+    if (existingScript) {
+      existingScript.addEventListener("load", initializeMap);
+      existingScript.addEventListener("error", () =>
+        setMapError("Google Maps could not be loaded. Enter coordinates manually below."),
+      );
+      return () => existingScript.removeEventListener("load", initializeMap);
+    }
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;
+    script.async = true;
+    script.defer = true;
+    script.onload = initializeMap;
+    script.onerror = () =>
+      setMapError("Google Maps could not be loaded. Enter coordinates manually below.");
+    document.head.appendChild(script);
   }, []);
+
+  useEffect(() => {
+    if (markerRef.current) markerRef.current.setPosition(selectedCoordinates);
+  }, [selectedCoordinates]);
+
+  function updateFarmField(field: keyof typeof farmForm, value: string) {
+    setFarmForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function useBrowserLocation() {
+    if (!navigator.geolocation) {
+      setMapError("Browser location is unavailable; select a point on the map.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coordinates = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setSelectedCoordinates(coordinates);
+        mapRef.current?.setCenter(coordinates);
+      },
+      () => setMapError("Location permission was unavailable; select a point on the map."),
+    );
+  }
+
+  async function createFarm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFarmFormError(null);
+    setFarmFormMessage(null);
+    setIsCreatingFarm(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/farms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...farmForm,
+          area_acres: Number(farmForm.area_acres),
+          latitude: selectedCoordinates.lat,
+          longitude: selectedCoordinates.lng,
+          soil_ph: Number(farmForm.soil_ph),
+          nitrogen: Number(farmForm.nitrogen),
+          phosphorus: Number(farmForm.phosphorus),
+          potassium: Number(farmForm.potassium),
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json()) as { detail?: string | { msg?: string }[] };
+        const detail = Array.isArray(body.detail)
+          ? body.detail.map((item) => item.msg ?? "Invalid value").join(", ")
+          : body.detail;
+        throw new Error(detail ?? "Unable to create the farm.");
+      }
+      const createdFarm = (await response.json()) as Farm;
+      setActiveFarmId(createdFarm.id);
+      setSelectedCoordinates({
+        lat: createdFarm.latitude ?? selectedCoordinates.lat,
+        lng: createdFarm.longitude ?? selectedCoordinates.lng,
+      });
+      setFarmFormMessage(`Farm created. Showing analysis for farm ID ${createdFarm.id}.`);
+    } catch (errorValue) {
+      setFarmFormError(getErrorMessage(errorValue, "Unable to create the farm."));
+    } finally {
+      setIsCreatingFarm(false);
+    }
+  }
+
+  function useDemoFarm() {
+    setActiveFarmId(1);
+    setSelectedCoordinates(demoCoordinates);
+    setFarmFormMessage("Using the demo farm (Farm ID 1).");
+    setFarmFormError(null);
+  }
 
   async function submitDiseaseScreening() {
     if (!selectedImage) {
@@ -317,6 +474,93 @@ export default function Home() {
           {health ? "FastAPI connected" : "Connecting..."}
         </div>
       </header>
+
+      <section className="secondary-panel farm-setup-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Live setup</p>
+            <h2>Analyze your farm</h2>
+          </div>
+          <span className="badge prototype">Farm ID {activeFarmId}</span>
+        </div>
+        <p className="section-help">
+          Add your farm and soil details. The map selects a latitude/longitude
+          point only; it does not measure boundaries or determine suitability.
+        </p>
+        <form className="farm-setup-form" onSubmit={createFarm}>
+          <div className="form-grid">
+            {([
+              ["name", "Farm name"],
+              ["state", "State"],
+              ["district", "District"],
+              ["village", "Village"],
+              ["area_acres", "Area (acres)"],
+              ["soil_type", "Soil type"],
+              ["current_crop", "Current crop"],
+              ["soil_ph", "Soil pH"],
+              ["nitrogen", "Nitrogen"],
+              ["phosphorus", "Phosphorus"],
+              ["potassium", "Potassium"],
+            ] as const).map(([field, label]) => (
+              <label key={field}>
+                {label}
+                <input
+                  required
+                  type={["area_acres", "soil_ph", "nitrogen", "phosphorus", "potassium"].includes(field) ? "number" : "text"}
+                  step="any"
+                  value={farmForm[field]}
+                  onChange={(event) => updateFarmField(field, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="map-picker">
+            <div className="map-heading">
+              <h3>Farm location</h3>
+              <button type="button" onClick={useBrowserLocation}>Use my location</button>
+            </div>
+            <div className="map-container" ref={mapContainerRef} />
+            {mapError && (
+              <>
+                <p className="section-message">{mapError}</p>
+                <div className="coordinate-fallback">
+                  <label>
+                    Latitude
+                    <input
+                      type="number"
+                      step="any"
+                      value={selectedCoordinates.lat}
+                      onChange={(event) => setSelectedCoordinates((current) => ({ ...current, lat: Number(event.target.value) }))}
+                    />
+                  </label>
+                  <label>
+                    Longitude
+                    <input
+                      type="number"
+                      step="any"
+                      value={selectedCoordinates.lng}
+                      onChange={(event) => setSelectedCoordinates((current) => ({ ...current, lng: Number(event.target.value) }))}
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+            {!mapError && (
+              <div className="selected-coordinates" aria-live="polite">
+                Selected coordinates: <strong>{selectedCoordinates.lat.toFixed(6)}, {selectedCoordinates.lng.toFixed(6)}</strong>
+              </div>
+            )}
+          </div>
+          {farmFormError && <p className="error">{farmFormError}</p>}
+          {farmFormMessage && <p className="success-message">{farmFormMessage}</p>}
+          <div className="farm-actions">
+            <button className="button-primary" disabled={isCreatingFarm} type="submit">
+              {isCreatingFarm ? "Creating farm..." : "Analyze my farm"}
+            </button>
+            <button type="button" onClick={useDemoFarm}>Use demo farm</button>
+          </div>
+        </form>
+      </section>
 
       <section className="farm-banner">
         {farm ? (

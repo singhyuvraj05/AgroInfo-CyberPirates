@@ -12,9 +12,9 @@ database/  MySQL setup notes
 ai/        Reserved for future Python AI/ML work
 ```
 
-The current milestone implements only a health check and a database-backed
-demo farm lookup. Weather, AI/ML, disease detection, NDVI, recommendations,
-cooperative sharing, and authentication are intentionally not included yet.
+The dashboard includes live farm setup, weather, transparent prototype
+advisory and crop recommendations, synthetic vegetation data, constrained
+disease screening, and a prototype cooperative registry.
 
 ## Requirements
 
@@ -58,6 +58,7 @@ they do not already exist.
 Useful endpoints:
 
 - `GET http://localhost:8000/api/health`
+- `POST http://localhost:8000/api/farms`
 - `GET http://localhost:8000/api/farms/1`
 - `GET http://localhost:8000/api/weather/1`
 - `GET http://localhost:8000/api/advisory/1`
@@ -159,6 +160,20 @@ Frontend configuration is in [frontend/.env.example](frontend/.env.example):
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 ```
+
+The optional map picker uses only the Google Maps JavaScript API. Put the
+browser key in `frontend/.env.local`, never in source control, and restrict it
+by allowed HTTP referrers and the Maps JavaScript API in Google Cloud. If the
+key is absent or the script cannot load, the form provides manual coordinate
+inputs as a fallback. The map selects a point; it does not measure farm
+boundaries, geocode locations, or provide precision agriculture.
+
+To create a live farm, enter the required farm and soil values, click the map
+to place the single marker, then choose **Analyze my farm**. The returned farm
+ID becomes active and the existing weather, advisory, recommendation, and
+vegetation endpoints reload for that farm. Farm ID 1 remains available through
+**Use demo farm**.
 
 Do not commit `.env` or `.env.local` files.

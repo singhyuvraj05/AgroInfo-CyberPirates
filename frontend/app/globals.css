@@ -416,6 +416,75 @@ section {
   padding: 24px;
 }
 
+.farm-setup-panel {
+  border-color: #bfd8c3;
+}
+
+.farm-setup-form label,
+.coordinate-fallback label {
+  color: var(--ink-soft);
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.farm-setup-form input {
+  width: 100%;
+}
+
+.map-picker {
+  margin-top: 18px;
+}
+
+.map-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.map-heading h3 {
+  color: var(--green-dark);
+  margin: 0;
+}
+
+.map-container {
+  background: #e8efe9;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-height: 280px;
+  width: 100%;
+}
+
+.selected-coordinates {
+  background: var(--green-pale);
+  border-radius: 7px;
+  color: var(--green-dark);
+  font-size: 0.9rem;
+  margin-top: 10px;
+  padding: 10px 12px;
+}
+
+.coordinate-fallback {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 10px;
+}
+
+.farm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.success-message {
+  color: var(--green);
+  font-weight: 600;
+}
+
 .upload-row,
 .reuse-row {
   align-items: center;
