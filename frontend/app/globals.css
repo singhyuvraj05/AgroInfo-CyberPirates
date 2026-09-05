@@ -39,3 +39,7 @@ dt {
 dd {
   margin: 4px 0 0;
 }
+
+ul {
+  padding-left: 20px;
+}

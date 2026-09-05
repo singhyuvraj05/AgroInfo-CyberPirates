@@ -59,6 +59,7 @@ Useful endpoints:
 
 - `GET http://localhost:8000/api/health`
 - `GET http://localhost:8000/api/farms/1`
+- `GET http://localhost:8000/api/weather/1`
 
 ## Frontend setup
 
@@ -73,6 +74,10 @@ npm run dev
 Open <http://localhost:3000>. The page requests the health endpoint and then
 loads the demo farm through FastAPI. The browser never connects directly to
 MySQL.
+
+The weather endpoint reads the farm coordinates from MySQL and retrieves
+current and three-day precipitation data from Open-Meteo. Open-Meteo does not
+require an API key for this demo.
 
 ## Configuration
 

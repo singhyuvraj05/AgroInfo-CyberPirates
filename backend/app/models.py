@@ -15,3 +15,5 @@ class Farm(Base):
     area_acres: Mapped[float] = mapped_column(Float, nullable=False)
     soil_type: Mapped[str] = mapped_column(String(80), nullable=False)
     current_crop: Mapped[str] = mapped_column(String(80), nullable=False)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
