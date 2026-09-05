@@ -5,10 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
+from app.advisory import AdvisoryInputs, generate_advisory
 from app.config import settings
 from app.database import Base, engine, get_db
 from app.models import Farm
-from app.schemas import FarmResponse, WeatherResponse
+from app.schemas import AdvisoryResponse, FarmResponse, WeatherResponse
 from app.weather import WeatherServiceError, get_weather
 
 
@@ -22,6 +23,14 @@ def initialize_database() -> None:
             connection.execute(text("ALTER TABLE farms ADD COLUMN latitude FLOAT NULL"))
         if "longitude" not in existing_columns:
             connection.execute(text("ALTER TABLE farms ADD COLUMN longitude FLOAT NULL"))
+        if "soil_ph" not in existing_columns:
+            connection.execute(text("ALTER TABLE farms ADD COLUMN soil_ph FLOAT NULL"))
+        if "nitrogen" not in existing_columns:
+            connection.execute(text("ALTER TABLE farms ADD COLUMN nitrogen FLOAT NULL"))
+        if "phosphorus" not in existing_columns:
+            connection.execute(text("ALTER TABLE farms ADD COLUMN phosphorus FLOAT NULL"))
+        if "potassium" not in existing_columns:
+            connection.execute(text("ALTER TABLE farms ADD COLUMN potassium FLOAT NULL"))
 
     with Session(engine) as session:
         demo_farm = session.scalar(select(Farm).where(Farm.id == 1))
@@ -38,12 +47,25 @@ def initialize_database() -> None:
                     current_crop="Soybean",
                     latitude=20.0059,
                     longitude=73.7897,
+                    soil_ph=6.8,
+                    nitrogen=55,
+                    phosphorus=22,
+                    potassium=145,
                 )
             )
             session.commit()
-        elif demo_farm.latitude is None or demo_farm.longitude is None:
-            demo_farm.latitude = 20.0059
-            demo_farm.longitude = 73.7897
+        else:
+            if demo_farm.latitude is None or demo_farm.longitude is None:
+                demo_farm.latitude = 20.0059
+                demo_farm.longitude = 73.7897
+            if demo_farm.soil_ph is None:
+                demo_farm.soil_ph = 6.8
+            if demo_farm.nitrogen is None:
+                demo_farm.nitrogen = 55
+            if demo_farm.phosphorus is None:
+                demo_farm.phosphorus = 22
+            if demo_farm.potassium is None:
+                demo_farm.potassium = 145
             session.commit()
 
 
@@ -110,4 +132,47 @@ def get_farm_weather(farm_id: int, db: Session = Depends(get_db)) -> WeatherResp
         humidity=current["relative_humidity_2m"],
         precipitation=current["precipitation"],
         forecast=forecast,
+    )
+
+
+@app.get("/api/advisory/{farm_id}", response_model=AdvisoryResponse)
+def get_farm_advisory(
+    farm_id: int, db: Session = Depends(get_db)
+) -> AdvisoryResponse:
+    farm = db.get(Farm, farm_id)
+    if farm is None:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    soil_values = (farm.soil_ph, farm.nitrogen, farm.phosphorus, farm.potassium)
+    if farm.latitude is None or farm.longitude is None:
+        raise HTTPException(status_code=422, detail="Farm coordinates are missing")
+    if any(value is None for value in soil_values):
+        raise HTTPException(status_code=422, detail="Farm soil data is incomplete")
+
+    try:
+        weather = get_weather(farm.latitude, farm.longitude)
+    except WeatherServiceError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    daily = weather["daily"]
+    inputs = AdvisoryInputs(
+        crop=farm.current_crop,
+        soil_ph=farm.soil_ph,
+        nitrogen=farm.nitrogen,
+        phosphorus=farm.phosphorus,
+        potassium=farm.potassium,
+        temperature=weather["current"]["temperature_2m"],
+        humidity=weather["current"]["relative_humidity_2m"],
+        precipitation=weather["current"]["precipitation"],
+        forecast_precipitation=sum(daily["precipitation_sum"]),
+    )
+    result = generate_advisory(inputs)
+    return AdvisoryResponse(
+        farm_id=farm.id,
+        crop=farm.current_crop,
+        risk_level=result.risk_level,
+        score=result.score,
+        risks=result.risks,
+        recommendations=result.recommendations,
+        reasons=result.reasons,
+        confidence=result.confidence,
     )

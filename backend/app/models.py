@@ -17,3 +17,7 @@ class Farm(Base):
     current_crop: Mapped[str] = mapped_column(String(80), nullable=False)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    soil_ph: Mapped[float | None] = mapped_column(Float, nullable=True)
+    nitrogen: Mapped[float | None] = mapped_column(Float, nullable=True)
+    phosphorus: Mapped[float | None] = mapped_column(Float, nullable=True)
+    potassium: Mapped[float | None] = mapped_column(Float, nullable=True)

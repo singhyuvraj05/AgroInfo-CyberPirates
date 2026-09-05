@@ -27,3 +27,14 @@ class WeatherResponse(BaseModel):
     humidity: int
     precipitation: float
     forecast: list[ForecastDay]
+
+
+class AdvisoryResponse(BaseModel):
+    farm_id: int
+    crop: str
+    risk_level: str
+    score: int
+    risks: list[str]
+    recommendations: list[str]
+    reasons: list[str]
+    confidence: float

@@ -30,6 +30,17 @@ type Weather = {
   }[];
 };
 
+type Advisory = {
+  farm_id: number;
+  crop: string;
+  risk_level: string;
+  score: number;
+  risks: string[];
+  recommendations: string[];
+  reasons: string[];
+  confidence: number;
+};
+
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -37,24 +48,37 @@ export default function Home() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [farm, setFarm] = useState<Farm | null>(null);
   const [weather, setWeather] = useState<Weather | null>(null);
+  const [advisory, setAdvisory] = useState<Advisory | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [healthResponse, farmResponse, weatherResponse] = await Promise.all([
+        const [
+          healthResponse,
+          farmResponse,
+          weatherResponse,
+          advisoryResponse,
+        ] = await Promise.all([
           fetch(`${apiBaseUrl}/api/health`),
           fetch(`${apiBaseUrl}/api/farms/1`),
           fetch(`${apiBaseUrl}/api/weather/1`),
+          fetch(`${apiBaseUrl}/api/advisory/1`),
         ]);
 
-        if (!healthResponse.ok || !farmResponse.ok || !weatherResponse.ok) {
+        if (
+          !healthResponse.ok ||
+          !farmResponse.ok ||
+          !weatherResponse.ok ||
+          !advisoryResponse.ok
+        ) {
           throw new Error("The backend returned an error.");
         }
 
         setHealth((await healthResponse.json()) as HealthResponse);
         setFarm((await farmResponse.json()) as Farm);
         setWeather((await weatherResponse.json()) as Weather);
+        setAdvisory((await advisoryResponse.json()) as Advisory);
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -77,6 +101,33 @@ export default function Home() {
       <section className="card">
         <h2>System status</h2>
         <p>{health ? `FastAPI: ${health.status}` : "Checking FastAPI..."}</p>
+      </section>
+
+      <section className="card">
+        <h2>Agricultural advisory</h2>
+        {advisory ? (
+          <>
+            <p>
+              Overall risk: <strong>{advisory.risk_level}</strong> (
+              {advisory.score} points)
+            </p>
+            <p>Confidence: {Math.round(advisory.confidence * 100)}%</p>
+            <h3>Reasons</h3>
+            <ul>
+              {advisory.reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+            <h3>Recommended actions</h3>
+            <ul>
+              {advisory.recommendations.map((recommendation) => (
+                <li key={recommendation}>{recommendation}</li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p>Loading advisory...</p>
+        )}
       </section>
 
       <section className="card">

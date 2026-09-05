@@ -60,6 +60,7 @@ Useful endpoints:
 - `GET http://localhost:8000/api/health`
 - `GET http://localhost:8000/api/farms/1`
 - `GET http://localhost:8000/api/weather/1`
+- `GET http://localhost:8000/api/advisory/1`
 
 ## Frontend setup
 
@@ -78,6 +79,11 @@ MySQL.
 The weather endpoint reads the farm coordinates from MySQL and retrieves
 current and three-day precipitation data from Open-Meteo. Open-Meteo does not
 require an API key for this demo.
+
+The advisory endpoint applies transparent V1 rules to the farm crop, demo soil
+measurements, current weather, and three-day forecast rainfall. Nutrient
+thresholds are demo assumptions in mg/kg, not a substitute for a local soil
+test or agronomist.
 
 ## Configuration
 
