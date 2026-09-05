@@ -43,3 +43,19 @@ dd {
 ul {
   padding-left: 20px;
 }
+
+.screen-button {
+  display: block;
+  margin-top: 12px;
+  padding: 8px 12px;
+}
+
+.screen-button:disabled {
+  cursor: wait;
+}
+
+.screening-result {
+  border-top: 1px solid #d9e3d6;
+  margin-top: 16px;
+  padding-top: 12px;
+}

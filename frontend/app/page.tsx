@@ -40,6 +40,15 @@ type Vegetation = {
   note: string;
 };
 
+type DiseaseScreening = {
+  status: string;
+  observation: string;
+  certainty: string;
+  next_step: string;
+  is_demo: boolean;
+  disclaimer: string;
+};
+
 type Advisory = {
   farm_id: number;
   crop: string;
@@ -76,6 +85,10 @@ export default function Home() {
   const [recommendations, setRecommendations] =
     useState<Recommendations | null>(null);
   const [vegetation, setVegetation] = useState<Vegetation | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [screening, setScreening] = useState<DiseaseScreening | null>(null);
+  const [screeningError, setScreeningError] = useState<string | null>(null);
+  const [isScreening, setIsScreening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,12 +141,88 @@ export default function Home() {
     void loadData();
   }, []);
 
+  async function submitDiseaseScreening() {
+    if (!selectedImage) {
+      setScreeningError("Select a JPEG or PNG image first.");
+      return;
+    }
+    if (!["image/jpeg", "image/png"].includes(selectedImage.type)) {
+      setScreeningError("Only JPEG and PNG images are supported.");
+      return;
+    }
+    if (selectedImage.size > 5 * 1024 * 1024) {
+      setScreeningError("The image must be 5 MB or smaller.");
+      return;
+    }
+
+    setIsScreening(true);
+    setScreeningError(null);
+    setScreening(null);
+    const formData = new FormData();
+    formData.append("image", selectedImage);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/disease-screening`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        const body = (await response.json()) as { detail?: string };
+        throw new Error(body.detail ?? "Unable to screen the image.");
+      }
+      setScreening((await response.json()) as DiseaseScreening);
+    } catch (requestError) {
+      setScreeningError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to screen the image.",
+      );
+    } finally {
+      setIsScreening(false);
+    }
+  }
+
   return (
     <main className="container">
       <h1>AgroInfo</h1>
       <p>Initial frontend → FastAPI → MySQL milestone</p>
 
       {error && <p className="error">{error}</p>}
+
+      <section className="card">
+        <h2>Constrained disease screening prototype</h2>
+        <p className="note">
+          This accepts an image for a demo workflow only. It is not an AI
+          classifier or a validated disease diagnosis system.
+        </p>
+        <input
+          accept="image/jpeg,image/png"
+          onChange={(event) => {
+            setSelectedImage(event.target.files?.[0] ?? null);
+            setScreening(null);
+            setScreeningError(null);
+          }}
+          type="file"
+        />
+        <button
+          className="screen-button"
+          disabled={isScreening}
+          onClick={() => void submitDiseaseScreening()}
+          type="button"
+        >
+          {isScreening ? "Screening image..." : "Upload and screen"}
+        </button>
+        {screeningError && <p className="error">{screeningError}</p>}
+        {screening && (
+          <div className="screening-result">
+            <p>Status: {screening.status}</p>
+            <p>Observation: {screening.observation}</p>
+            <p>Prototype certainty: {screening.certainty}</p>
+            <p>Suggested next step: {screening.next_step}</p>
+            <p className="note">{screening.disclaimer}</p>
+          </div>
+        )}
+      </section>
 
       <section className="card">
         <h2>System status</h2>

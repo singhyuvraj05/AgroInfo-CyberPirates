@@ -64,3 +64,12 @@ class VegetationResponse(BaseModel):
     trend: str
     is_synthetic: bool
     note: str
+
+
+class DiseaseScreeningResponse(BaseModel):
+    status: str
+    observation: str
+    certainty: str
+    next_step: str
+    is_demo: bool
+    disclaimer: str

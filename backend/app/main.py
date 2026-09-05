@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
@@ -8,10 +8,17 @@ from sqlalchemy.orm import Session
 from app.advisory import AdvisoryInputs, generate_advisory
 from app.config import settings
 from app.database import Base, engine, get_db
+from app.disease import (
+    DemoDiseaseAnalyzer,
+    ImageValidationError,
+    MAX_IMAGE_SIZE,
+    validate_image_upload,
+)
 from app.models import Farm
 from app.recommendation import RecommendationInputs, rank_crops
 from app.schemas import (
     AdvisoryResponse,
+    DiseaseScreeningResponse,
     FarmResponse,
     RecommendationResponse,
     VegetationResponse,
@@ -88,14 +95,40 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+disease_analyzer = DemoDiseaseAnalyzer()
 
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post(
+    "/api/disease-screening",
+    response_model=DiseaseScreeningResponse,
+)
+async def screen_disease_image(
+    image: UploadFile = File(...),
+) -> DiseaseScreeningResponse:
+    image_bytes = await image.read(MAX_IMAGE_SIZE + 1)
+    try:
+        decoded_image = validate_image_upload(image_bytes, image.content_type)
+    except ImageValidationError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail) from error
+
+    result = disease_analyzer.analyze(decoded_image)
+    return DiseaseScreeningResponse(
+        status=result.status,
+        observation=result.observation,
+        certainty=result.certainty,
+        next_step=result.next_step,
+        is_demo=result.is_demo,
+        disclaimer=result.disclaimer,
+    )
 
 
 @app.get("/api/farms/{farm_id}", response_model=FarmResponse)

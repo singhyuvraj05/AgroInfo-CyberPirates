@@ -3,3 +3,5 @@ uvicorn[standard]==0.30.6
 SQLAlchemy==2.0.35
 PyMySQL==1.1.1
 pydantic-settings==2.5.2
+Pillow==11.3.0
+python-multipart==0.0.20

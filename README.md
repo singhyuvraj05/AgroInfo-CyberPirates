@@ -63,6 +63,7 @@ Useful endpoints:
 - `GET http://localhost:8000/api/advisory/1`
 - `GET http://localhost:8000/api/recommendations/1`
 - `GET http://localhost:8000/api/vegetation/1`
+- `POST http://localhost:8000/api/disease-screening`
 
 ## Frontend setup
 
@@ -125,6 +126,15 @@ otherwise      stable
 
 These thresholds are demonstration heuristics, not universal scientific
 standards or crop-health diagnosis.
+
+The disease-screening endpoint is a constrained image-screening prototype. It
+accepts JPEG and PNG uploads up to 5 MB, validates and decodes them in memory,
+and does not save images or store them in MySQL. V1 does not identify real
+diseases and does not use an AI model. A valid sufficiently sized image returns
+an observation that no disease classification was performed; an ambiguous
+image returns an uncertainty result. The certainty indicator is a prototype
+workflow label, not a scientific disease probability or diagnostic confidence.
+All responses include a non-diagnostic disclaimer.
 
 ## Configuration
 
